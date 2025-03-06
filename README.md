@@ -1,2 +1,2 @@
-# Autosplitters
-Collection of delcake's autosplitting scripts for various games
+# Autosplitters by delcake
+The autosplitting scripts I create will be managed here in this repository.
