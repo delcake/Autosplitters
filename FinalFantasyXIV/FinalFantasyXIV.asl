@@ -21,8 +21,10 @@ state("ffxiv_dx11", "2025.02.27.000.000(11450158)")
         31 = Returning Adventurer
         32 = New Adventurer
     */
+    uint skipCutscene: 0x27CD618, 0x33C;
     ulong promptState: 0x25DF670, 0x8, 0x90, 0x50, 0x70;
     string64 questName: 0x27CD618, 0x18, 0xE0, 0x238, 0xE2;
+    string64 activeMSQ: 0x27CD618, 0x220, 0x98, 0x298, 0x728, 0xE2;
 }
 
 startup
@@ -70,12 +72,18 @@ startup
 
 start
 {
-    // Start on accepting the opening quest of any NG+ category, with
+    // Start on accepting the opening quest of any NG/NG+ category, with
     // fallback to handle quests that launch directly into a cutscene.
     if (old.promptState == 1 && current.promptState == 0) {
         return vars.startingQuests.Contains(current.questName);
     } else if (current.playerStatus == 15 && current.playerStatus != old.playerStatus) {
         return vars.startingQuests.Contains(current.questName);
+    }
+
+    // Start when skipping the ARR opening cutscene upon character creation.
+    // This will also trigger if canceling the skip cutscene dialogue.
+    if (current.playerStatus == 15 && current.activeMSQ == "") {
+        return old.skipCutscene == 1 && current.skipCutscene == 0;
     }
 }
 
