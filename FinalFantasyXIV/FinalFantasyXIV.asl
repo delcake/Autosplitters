@@ -1,6 +1,6 @@
-state("ffxiv_dx11", "2025.02.27.000.000(11450158)")
+state("ffxiv_dx11", "2025.03.27.0000.0000(11571155)")
 {
-    uint playerStatus: 0x25E2980, 0x1D0;
+    uint playerStatus: 0x270BA60, 0x1C0;
     /*
         0 = Online
         5 = Link Dead
@@ -21,10 +21,10 @@ state("ffxiv_dx11", "2025.02.27.000.000(11450158)")
         31 = Returning Adventurer
         32 = New Adventurer
     */
-    uint skipCutscene: 0x27CD618, 0x33C;
-    ulong promptState: 0x25DF670, 0x8, 0x90, 0x50, 0x70;
-    string64 questName: 0x27CD618, 0x18, 0xE0, 0x238, 0xE2;
-    string64 activeMSQ: 0x27CD618, 0x220, 0x98, 0x298, 0x728, 0xE2;
+    uint skipCutscene: 0x28FA848, 0x33C;
+    ulong promptState: 0x2708720, 0x8, 0x90, 0x50, 0x70;
+    string64 questName: 0x28FA848, 0x18, 0xE0, 0x238, 0xE2;
+    string64 activeMSQ: 0x274D388, 0x28, 0x28, 0xD40, 0x358, 0x368, 0xE2;
 }
 
 startup
