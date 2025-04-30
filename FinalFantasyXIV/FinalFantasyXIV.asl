@@ -1,94 +1,90 @@
-state("ffxiv_dx11", "2025.03.27.0000.0000(11571155)")
-{
-    uint playerStatus: 0x270BA60, 0x1C0;
-    /*
-        0 = Online
-        5 = Link Dead
-        12 = Busy
-        14 = Triple Triad Match
-        15 = Cutscene
-        17 = AFK
-        18 = Group Pose
-        21 = Looking to Meld Materia
-        22 = Roleplaying
-        23 = Looking for Party
-        25 = Duty Registration Pending
-        26 = Party Finder Active
-        27 = Mentor
-        28 = PvE Mentor
-        29 = Trade Mentor
-        30 = PvP Mentor
-        31 = Returning Adventurer
-        32 = New Adventurer
-    */
-    uint skipCutscene: 0x28FA848, 0x33C;
-    ulong promptState: 0x2708720, 0x8, 0x90, 0x50, 0x70;
-    string64 questName: 0x28FA848, 0x18, 0xE0, 0x238, 0xE2;
-    string64 activeMSQ: 0x274D388, 0x28, 0x28, 0xD40, 0x358, 0x368, 0xE2;
-}
+state("ffxiv_dx11") {}
+
+// It may be required to run LiveSplit as an Administrator to be able to use the autosplitter on vanilla FFXIV installations.
 
 startup
 {
-    vars.startingQuests = new List<string>() {
-        // A Realm Reborn
-        "To the Bannock",           // Gridania
-        "On to Summerford",         // Limsa Lominsa
-        "We Must Rebuild",          // Ul'dah
-        "It's Probably Pirates",
-        "Shadow of Darkness",
-        "All Good Things",
-        "The Price of Principles",
-        "Traitor in the Midst",
-        // Heavensward
-        "Coming to Ishgard",
-        "The Wyrm's Lair",
-        "An Uncertain Future",
-        "Promises Kept",
-        // Stormblood
-        "Beyond the Great Wall",
-        "Here There Be Xaela",
-        "Arenvald's Adventure",
-        "Sisterly Act",
-        // Shadowbringers
-        "The Syrcus Trench",
-        "When It Rains",
-        "Shaken Resolve",
-        "Alisaie's Quest",
-        // Endwalker
-        "The Next Ship to Sail",
-        "Skies Aflame",
-        "Newfound Adventure",
-        "Currying Flavor",
-        // Dawntrail
-        "A New World to Explore",
-        "The Long Road to Xak Tural",
-        // Hildibrand
-        "The Rise and Fall of Gentlemen",
-        "A Gentleman Falls, Rather than Flies",
-        "A Hingan Tale: Nashu Goes East",
-        "The Sleeping Gentleman"
-    };
+    // Define all settings for the autosplitter.
+    settings.Add("options", true, "Advanced Options");
+	settings.Add("debug_file", false, "Save debug log to LiveSplit program directory", "options");
 }
 
-start
+init
 {
-    // Start on accepting the opening quest of any NG/NG+ category, with
-    // fallback to handle quests that launch directly into a cutscene.
-    if (old.promptState == 1 && current.promptState == 0) {
-        return vars.startingQuests.Contains(current.questName);
-    } else if (current.playerStatus == 15 && current.playerStatus != old.playerStatus) {
-        return vars.startingQuests.Contains(current.questName);
-    }
+    // Debug message handler
+	string DebugPath = System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\" + game.ProcessName + "_debug.log";
+	Action<string> DebugLog = (message) => {
+		message = "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + message;
+		if (settings["debug_file"]) {
+			using(System.IO.StreamWriter stream = new System.IO.StreamWriter(DebugPath, true)) {
+				stream.WriteLine(message);
+				stream.Close();
+			}
+		}
+		print("[FFXIV_LR] " + message);
+	};
+	vars.DebugLog = DebugLog;
 
-    // Start when skipping the ARR opening cutscene upon character creation.
-    // This will also trigger if canceling the skip cutscene dialogue.
-    if (current.playerStatus == 15 && current.activeMSQ == "") {
-        return old.skipCutscene == 1 && current.skipCutscene == 0;
-    }
+	// Establish required pointer locations.
+    IntPtr loadingRelPtr = IntPtr.Zero;
+	IntPtr activeCharacterRelPtr = IntPtr.Zero;
+
+    var loadingTarget = new SigScanTarget(3, "48 8B 05 ?? ?? ?? ?? 4C 8B 40 ?? 45 8B 40");
+	var activeCharacterTarget = new SigScanTarget(3, "48 8D 05 ?? ?? ?? ?? 8B 6C 24");
+
+	var scanner = new SignatureScanner(game, modules.First().BaseAddress, modules.First().ModuleMemorySize);
+
+	bool scanningError = false;
+    if ((loadingRelPtr = scanner.Scan(loadingTarget)) != IntPtr.Zero) {
+        print("Loading signature found at 0x" + loadingRelPtr.ToString("X"));
+    } else {
+		scanningError = true;
+	}
+	
+	if ((activeCharacterRelPtr = scanner.Scan(activeCharacterTarget)) != IntPtr.Zero) {
+		print("Active character signature found at 0x" + activeCharacterRelPtr.ToString("X"));
+	} else {
+		scanningError = true;
+	}
+	
+	if (scanningError) {
+		throw new Exception("[FFXIV_LR] Unable to locate one or more critical signatures");
+	}
+
+	vars.loadingRelPtr = loadingRelPtr;
+    vars.loadingPtr = loadingRelPtr + 0x4 + game.ReadValue<int>(loadingRelPtr);
+
+	vars.activeCharacterRelPtr = activeCharacterRelPtr;
+	vars.activeCharacterPtr = activeCharacterRelPtr + 0x4 + game.ReadValue<int>(activeCharacterRelPtr);
+
+	vars.watchers = new MemoryWatcherList() {
+        (vars.loading = new MemoryWatcher<int>(new DeepPointer(vars.loadingPtr, 0x20, 0x6910, 0x178, 0x8))),
+		(vars.activeCharacter = new MemoryWatcher<int>(new DeepPointer(vars.activeCharacterPtr, 0x30)))
+	};
 }
 
-split
+update
 {
-    // Splits on any quest complete.
-    return old.promptState == 2 && current.promptState == 0;
+	// Perform all watcher state updates.
+	vars.watchers.UpdateAll(game);
+}
+
+exit
+{
+	// Pause the timer if the process is closed, such as if the game has crashed.
+	timer.IsGameTimePaused = true;
+}
+
+isLoading
+{
+	return vars.loading.Current == 1 || vars.activeCharacter.Current == 0;
+}
+
+onStart
+{
+	vars.DebugLog("Timer started");
+	vars.DebugLog(" - Loading signature position: 0x" + vars.loadingRelPtr.ToString("X"));
+    vars.DebugLog(" - Loading pointer position: 0x" + vars.loadingPtr.ToString("X"));
+	vars.DebugLog(" - Active character signature position: 0x" + vars.activeCharacterRelPtr.ToString("X"));
+	vars.DebugLog(" - Active character pointer position: 0x" + vars.activeCharacterPtr.ToString("X"));
 }
