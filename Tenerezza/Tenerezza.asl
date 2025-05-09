@@ -56,15 +56,12 @@ start
 
 split
 {
+    if (old.flagIndy1 == 0 && current.flagIndy1 == 1) return settings["IndyCS1Flag"];
+    if (old.flagIndy2 == 2 && current.flagIndy2 == 3) return settings["IndyCS2Flag"];
+    if (old.flagKathy == 0 && current.flagKathy == 1) return settings["KathyCSFlag"];
+
     bool bossDefeated = old.bossHP != current.bossHP && current.bossHP == 0 && current.inBossFight == 1;
-
-    if (settings["IndyCS1Flag"] && old.flagIndy1 == 0 && current.flagIndy1 == 1) return true;
-    if (settings["IndyCS2Flag"] && old.flagIndy2 == 2 && current.flagIndy2 == 3) return true;
-    if (settings["KathyCSFlag"] && old.flagKathy == 0 && current.flagKathy == 1) return true;
-
-    if (bossDefeated) {
-        if (settings[current.Location]) return true;
-    }
+    if (bossDefeated) return settings[current.Location];
 }
 
 reset
